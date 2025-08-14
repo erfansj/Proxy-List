@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="fa">
+<head>
+  <meta charset="UTF-8">
+  <title>لیست پروکسی‌ها</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #121212;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      direction: rtl;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 28px;
+      color: #00bcd4;
+    }
+
+    .proxy-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 20px;
+    }
+
+    .proxy-card {
+      background-color: #1f1f2f;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: transform 0.2s;
+      position: relative;
+    }
+
+    .proxy-card:hover {
+      transform: scale(1.02);
+    }
+
+    .proxy-title {
+      font-size: 18px;
+      margin-bottom: 10px;
+      color: #ff9800;
+    }
+
+    .proxy-info {
+      font-size: 14px;
+      margin-bottom: 20px;
+      line-height: 1.8;
+    }
+
+    .buttons {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      text-align: center;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      color: #fff;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .btn-connect {
+      background-color: #4caf50;
+    }
+
+    .btn-connect:hover {
+      background-color: #388e3c;
+    }
+
+    .btn-copy {
+      background-color: #2196f3;
+    }
+
+    .btn-copy:hover {
+      background-color: #1976d2;
+    }
+
+    .btn-qr {
+      background-color: #ff5722;
+    }
+
+    .btn-qr:hover {
+      background-color: #e64a19;
+    }
+
+    canvas {
+      margin-top: 15px;
+      display: block;
+      margin-left: auto;
+      margin-right: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>لیست پروکسی‌های تلگرام</h1>
+  <div class="proxy-grid" id="proxyGrid"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script>
+    async function fetchProxies() {
+      try {
+        const mtprotoRes = await fetch('https://mtpro.xyz/api/?type=mtproto');
+        const socksRes = await fetch('https://mtpro.xyz/api/?type=socks');
+        const mtprotoList = await mtprotoRes.json();
+        const socksList = await socksRes.json();
+
+        const allProxies = [
+          ...mtprotoList.map(p => ({ ...p, type: 'mtproto' })),
+          ...socksList.map(p => ({ ...p, type: 'socks' }))
+        ].sort((a, b) => (b.addTime || 0) - (a.addTime || 0));
+
+        const container = document.getElementById('proxyGrid');
+
+        allProxies.forEach((proxy, index) => {
+          const card = document.createElement('div');
+          card.className = 'proxy-card';
+
+          let proxyLink = '';
+          if (proxy.type === 'mtproto') {
+            proxyLink = `tg://proxy?server=${proxy.host.replace('https://', '')}&port=${proxy.port}&secret=${proxy.secret}`;
+          } else {
+            proxyLink = `socks5://${proxy.ip}:${proxy.port}`;
+          }
+
+          const date = proxy.addTime ? new Date(proxy.addTime * 1000).toLocaleString('fa-IR') : 'نامشخص';
+
+          card.innerHTML = `
+            <div class="proxy-title">${proxy.type.toUpperCase()} - ${proxy.country || 'نامشخص'}</div>
+            <div class="proxy-info">
+              پینگ: ${proxy.ping || 'نامشخص'}ms<br>
+              ارائه‌دهنده: ${proxy.provider || 'نامشخص'}<br>
+              زمان اضافه شدن: ${date}
+            </div>
+            <div class="buttons">
+              <button class="btn btn-qr" onclick="generateQR(this, '${proxyLink}', ${index})">QR</button>
+              <button class="btn btn-copy" onclick="copyToClipboard('${proxyLink}', this)">کپی</button>
+              <button class="btn btn-connect" onclick="window.open('${proxyLink}')">اتصال</button>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      } catch (err) {
+        console.error('خطا در دریافت پروکسی‌ها:', err);
+      }
+    }
+
+    const shownQR = new Set();
+
+    function generateQR(button, text, index) {
+      if (shownQR.has(index)) return; // اگر قبلاً نمایش داده شده، کاری نکن
+
+      const canvas = document.createElement('canvas');
+      QRCode.toCanvas(canvas, text, { width: 150 }, function (error) {
+        if (error) console.error(error);
+        button.parentElement.parentElement.appendChild(canvas);
+        shownQR.add(index); // ثبت کنیم که QR این پروکسی نمایش داده شده
+      });
+    }
+
+    async function copyToClipboard(text, button) {
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = '✅ کپی شد';
+        setTimeout(() => button.textContent = 'کپی', 2000);
+      } catch (err) {
+        console.error('خطا در کپی:', err);
+        button.textContent = '❌ خطا';
+      }
+    }
+
+    fetchProxies();
+  </script>
+
+</body>
+</html>
